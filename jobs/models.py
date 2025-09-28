@@ -65,10 +65,12 @@ class JobTask(models.Model):
 
     job = models.ForeignKey(Job, related_name="tasks", on_delete=models.CASCADE)
     order = models.PositiveIntegerField(default=0, help_text="Lower numbers run earlier")
+    required_equipment = models.ManyToManyField(
+        "equipment.Equipment", related_name="required_by_tasks", blank=True
+    )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
-    required_equipment = models.BooleanField(default=False)
     completed_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

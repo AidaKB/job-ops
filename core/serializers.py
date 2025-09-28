@@ -19,12 +19,23 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('password2')
-        admin = models.CustomUser.objects.create_superuser(
-            username=validated_data.pop('username', None),
-            password=validated_data.pop('password', None),
-            **validated_data
-        )
-        return admin
+        password = validated_data.pop('password')
+        role = validated_data.get('role')
+
+        if role == 'admin':
+            user = models.CustomUser.objects.create_superuser(
+                username=validated_data.pop('username'),
+                password=password,
+                **validated_data
+            )
+        else:
+            user = models.CustomUser.objects.create_user(
+                username=validated_data.pop('username'),
+                password=password,
+                **validated_data
+            )
+
+        return user
 
     def update(self, instance, validated_data):
         validated_data.pop('password2', None)
