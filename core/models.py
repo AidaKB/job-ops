@@ -10,7 +10,7 @@ class CustomUser(AbstractUser, PermissionsMixin):
         TECHNICIAN = "technician", "Technician"
         SALES = "sales_agent", "SalesAgent"
 
-    role = models.CharField(max_length=20, choices=Roles.choices, default=Roles.SALES)
+    role = models.CharField(max_length=20, choices=Roles.choices, default=Roles.ADMIN)
     username = models.CharField(max_length=255, unique=True)
     email = models.EmailField(max_length=254)
     first_name = models.CharField(max_length=255, null=True, blank=True)

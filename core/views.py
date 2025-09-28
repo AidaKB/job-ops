@@ -1,9 +1,16 @@
-from dj_rest_auth.views import LoginView
-from . import serializers
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
+from rest_framework import generics
+from .models import CustomUser
+from .serializers import CustomUserSerializer
+from rest_framework import permissions
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class CustomLoginView(LoginView):
-    serializer_class = serializers.CustomLoginSerializer
+class CustomUserListCreateAPIView(generics.ListCreateAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = CustomUserSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+
+class CustomUserDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = CustomUserSerializer
+    permission_classes = [permissions.IsAdminUser]
