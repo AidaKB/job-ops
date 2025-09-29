@@ -58,7 +58,7 @@ class Job(models.Model):
 
 class JobTask(models.Model):
     class Status(models.TextChoices):
-        PENDING = "pending", "Pending"
+        UPCOMING = "upcoming", "Upcoming"
         IN_PROGRESS = "in_progress", "In Progress"
         BLOCKED = "blocked", "Blocked"
         COMPLETED = "completed", "Completed"
@@ -70,7 +70,7 @@ class JobTask(models.Model):
     )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.UPCOMING)
     completed_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -94,17 +94,3 @@ class JobTask(models.Model):
             job.status = Job.Status.COMPLETED
             job.save()
 
-
-class JobTaskEquipment(models.Model):
-    task = models.ForeignKey(JobTask, related_name="assigned_equipments", on_delete=models.CASCADE)
-    equipment = models.ForeignKey("equipment.Equipment", related_name="assignments", on_delete=models.PROTECT)
-
-    quantity = models.PositiveIntegerField(default=1)
-    assigned_at = models.DateTimeField(auto_now_add=True)
-    description = models.TextField(blank=True)
-
-    class Meta:
-        unique_together = (("task", "equipment"),)
-
-    def __str__(self):
-        return f"{self.equipment} x{self.quantity} -> {self.task}"

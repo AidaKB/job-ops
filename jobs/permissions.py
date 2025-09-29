@@ -1,13 +1,15 @@
-from rest_framework.permissions import BasePermission, SAFE_METHODS
+from rest_framework import permissions
 
 
-class IsAdminOrSalesForCreate(BasePermission):
-    def has_permission(self, request, view):
-        if request.method in SAFE_METHODS:
-            return request.user and request.user.is_authenticated
-
-        return (
-                request.user
-                and request.user.is_authenticated
-                and (request.user.is_admin() or request.user.is_sales())
-        )
+class IsAllowedToModifyJobTask(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        if user.is_admin():
+            return True
+        elif user.is_sales():
+            return obj.job.created_by == user
+        elif user.is_technician():
+            if view.action in ['destroy']:
+                return False
+            return obj.job.assigned_to == user
+        return False
