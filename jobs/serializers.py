@@ -68,7 +68,6 @@ class JobTaskSerializer(serializers.ModelSerializer):
 
                 if user.is_sales():
                     self.fields.pop('status', None)
-
                 elif user.is_technician():
                     allowed_fields = ['status', 'required_equipment']
                     for field_name in list(self.fields.keys()):
@@ -76,6 +75,18 @@ class JobTaskSerializer(serializers.ModelSerializer):
                             'id', 'created_at', 'updated_at', 'completed_at'
                         ]:
                             self.fields.pop(field_name)
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        user = request.user if request else None
+
+        if user and user.is_sales():
+            job = attrs.get('job') or getattr(self.instance, 'job', None)
+            if job and job.created_by != user:
+                raise serializers.ValidationError(
+                    {"job": "You can only assign tasks to jobs you created."}
+                )
+        return attrs
 
     def create(self, validated_data):
         equipment_ids = validated_data.pop('required_equipment_ids', [])
@@ -86,7 +97,6 @@ class JobTaskSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         equipment_data = validated_data.pop('required_equipment', None)
-
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
@@ -100,11 +110,9 @@ class JobTaskSerializer(serializers.ModelSerializer):
                         setattr(eq_obj, attr, value)
                 eq_obj.save()
                 updated_equipment_ids.append(eq_obj.id)
-
             instance.required_equipment.set(updated_equipment_ids)
 
         return instance
-
 
 class DailyTechnicianLogSerializer(serializers.ModelSerializer):
     job_title = serializers.CharField(source='job.title', read_only=True)

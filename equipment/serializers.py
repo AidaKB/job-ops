@@ -2,6 +2,12 @@ from rest_framework import serializers
 from . import models
 
 
+class EquipmentListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.Equipment
+        fields = '__all__'
+
+
 class EquipmentSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(required=True)
 
