@@ -114,6 +114,7 @@ class JobTaskSerializer(serializers.ModelSerializer):
 
         return instance
 
+
 class DailyTechnicianLogSerializer(serializers.ModelSerializer):
     job_title = serializers.CharField(source='job.title', read_only=True)
     required_equipment = EquipmentSerializer(many=True, read_only=False)
@@ -122,3 +123,10 @@ class DailyTechnicianLogSerializer(serializers.ModelSerializer):
         model = models.JobTask
         fields = ['id', 'job_title', 'title', 'description', 'status', 'completed_at', 'required_equipment', 'order',
                   'created_at', 'updated_at']
+
+
+class JobAnalyticsSerializer(serializers.Serializer):
+    average_task_time = serializers.FloatField()
+    most_used_equipment = serializers.ListField(
+        child=serializers.CharField()
+    )

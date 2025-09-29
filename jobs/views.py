@@ -1,12 +1,16 @@
 from rest_framework import generics
 from . import models
-from .serializers import JobSerializer, TechnicianJobUpdateSerializer, JobTaskSerializer, DailyTechnicianLogSerializer
+from .serializers import (JobSerializer, TechnicianJobUpdateSerializer, JobTaskSerializer,
+                          DailyTechnicianLogSerializer, JobAnalyticsSerializer)
 from core.permissions import IsAdminOrSalesForCreate
 from rest_framework.exceptions import PermissionDenied
 from rest_framework import permissions
 from .permissions import IsAllowedToModifyJobTask, IsTechnician
 from collections import defaultdict
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from django.db.models import Avg, F, ExpressionWrapper, DurationField, Count
+from equipment.models import Equipment
 
 
 class JobListCreateAPIView(generics.ListCreateAPIView):
@@ -165,3 +169,37 @@ class DailyTechnicianLogAPIView(generics.ListAPIView):
             grouped_tasks[day].append(self.get_serializer(task).data)
 
         return Response(grouped_tasks)
+
+
+class JobAnalyticsAPIView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request, *args, **kwargs):
+        # average task time
+        completed_tasks = models.JobTask.objects.exclude(completed_at__isnull=True)
+        avg_time = completed_tasks.aggregate(
+            avg_time=Avg(
+                ExpressionWrapper(
+                    F('completed_at') - F('created_at'),
+                    output_field=DurationField()
+                )
+            )
+        )['avg_time']
+
+        if avg_time:
+            avg_time = avg_time.total_seconds() / 3600
+
+        # most used equipment
+        equipment_counts = Equipment.objects.annotate(
+            usage_count=Count('required_by_tasks')
+        ).order_by('-usage_count')
+
+        most_used_equipment = [eq.name for eq in equipment_counts if eq.usage_count > 0][:5]
+
+        data = {
+            'average_task_time': avg_time or 0,
+            'most_used_equipment': most_used_equipment
+        }
+
+        serializer = JobAnalyticsSerializer(data)
+        return Response(serializer.data)

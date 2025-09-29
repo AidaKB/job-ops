@@ -11,5 +11,6 @@ urlpatterns = [
     path('job-tasks/<int:pk>/', views.JobTaskDetailAPIView.as_view(), name='job_tasks_detail'),
 
     path('daily-technician-log/', views.DailyTechnicianLogAPIView.as_view(), name='job_tasks'),
+    path('job-analytics/', views.JobAnalyticsAPIView.as_view(), name='job-analytics'),
 
 ]

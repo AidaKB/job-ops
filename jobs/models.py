@@ -32,6 +32,7 @@ class Job(models.Model):
     priority = models.PositiveSmallIntegerField(choices=PRIORITY_LEVELS, default=2)
 
     scheduled_date = models.DateField(null=True, blank=True)
+    is_overdue = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
