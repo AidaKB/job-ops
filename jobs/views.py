@@ -4,7 +4,7 @@ from .serializers import JobSerializer, TechnicianJobUpdateSerializer, JobTaskSe
 from core.permissions import IsAdminOrSalesForCreate
 from rest_framework.exceptions import PermissionDenied
 from rest_framework import permissions
-from .permissions import IsAllowedToModifyJobTask
+from .permissions import IsAllowedToModifyJobTask, IsTechnician
 from collections import defaultdict
 from rest_framework.response import Response
 
@@ -147,7 +147,7 @@ class JobTaskDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 
 class DailyTechnicianLogAPIView(generics.ListAPIView):
     serializer_class = DailyTechnicianLogSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsTechnician]
 
     def get_queryset(self):
         user = self.request.user
@@ -161,7 +161,7 @@ class DailyTechnicianLogAPIView(generics.ListAPIView):
         grouped_tasks = defaultdict(list)
 
         for task in queryset:
-            day = task.job.scheduled_date
+            day = task.job.scheduled_date.isoformat() if task.job.scheduled_date else "unscheduled"
             grouped_tasks[day].append(self.get_serializer(task).data)
 
         return Response(grouped_tasks)

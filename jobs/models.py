@@ -45,16 +45,6 @@ class Job(models.Model):
     def all_tasks_completed(self):
         return not self.tasks.exclude(status=JobTask.Status.COMPLETED).exists()
 
-    def clean(self):
-        # Prevent moving to completed if not all tasks complete
-        if self.status == self.Status.COMPLETED and not self.all_tasks_completed():
-            raise ValidationError("Cannot mark job as completed while some tasks are incomplete.")
-
-    def save(self, *args, **kwargs):
-        # enforce clean before saving
-        self.full_clean()
-        super().save(*args, **kwargs)
-
 
 class JobTask(models.Model):
     class Status(models.TextChoices):
@@ -83,14 +73,21 @@ class JobTask(models.Model):
     def __str__(self):
         return f"{self.job.title} - {self.order}: {self.title}"
 
-    def mark_completed(self, by_user=None):
-        self.status = self.Status.COMPLETED
-        self.completed_at = timezone.now()
-        self.save()
+    def save(self, *args, **kwargs):
+        if self.pk:
+            old_status = JobTask.objects.get(pk=self.pk).status
+            if old_status != self.status and self.status == self.Status.COMPLETED:
+                self.completed_at = timezone.now()
+        elif self.status == self.Status.COMPLETED:
+            self.completed_at = timezone.now()
 
-        # if the job has all tasks completed, change job status
-        job = self.job
-        if job.all_tasks_completed():
-            job.status = Job.Status.COMPLETED
-            job.save()
+        super().save(*args, **kwargs)
 
+        if self.status == self.Status.COMPLETED:
+            incomplete_exists = JobTask.objects.filter(
+                job=self.job
+            ).exclude(status=self.Status.COMPLETED).exists()
+
+            if not incomplete_exists:
+                self.job.status = Job.Status.COMPLETED
+                self.job.save()

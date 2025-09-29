@@ -9,7 +9,12 @@ class IsAllowedToModifyJobTask(permissions.BasePermission):
         elif user.is_sales():
             return obj.job.created_by == user
         elif user.is_technician():
-            if view.action in ['destroy']:
+            if request.method == 'DELETE':
                 return False
             return obj.job.assigned_to == user
         return False
+
+
+class IsTechnician(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.is_technician())
