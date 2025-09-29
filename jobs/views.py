@@ -1,10 +1,12 @@
 from rest_framework import generics
 from . import models
-from .serializers import JobSerializer, TechnicianJobUpdateSerializer, JobTaskSerializer
+from .serializers import JobSerializer, TechnicianJobUpdateSerializer, JobTaskSerializer, DailyTechnicianLogSerializer
 from core.permissions import IsAdminOrSalesForCreate
 from rest_framework.exceptions import PermissionDenied
 from rest_framework import permissions
 from .permissions import IsAllowedToModifyJobTask
+from collections import defaultdict
+from rest_framework.response import Response
 
 
 class JobListCreateAPIView(generics.ListCreateAPIView):
@@ -86,28 +88,6 @@ class JobTaskListCreateAPIView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_admin():
-            return models.JobTask.objects.all()
-        elif user.is_sales():
-            return models.JobTask.objects.filter(job__created_by=user)
-        elif user.is_technician():
-            return models.JobTask.objects.filter(job__assigned_to=user)
-        return models.JobTask.objects.none()
-
-    def perform_create(self, serializer):
-        user = self.request.user
-        if user.is_admin() or user.is_sales():
-            serializer.save()
-        else:
-            raise PermissionDenied("Only admins and sales agents can create job tasks.")
-
-
-class JobTaskListCreateAPIView(generics.ListCreateAPIView):
-    serializer_class = JobTaskSerializer
-    permission_classes = [IsAdminOrSalesForCreate]
-
-    def get_queryset(self):
-        user = self.request.user
         qs = models.JobTask.objects.select_related('job').prefetch_related('required_equipment')
         if user.is_admin():
             return qs.all()
@@ -163,3 +143,25 @@ class JobTaskDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
             raise PermissionDenied("Technicians are not allowed to delete tasks.")
         else:
             raise PermissionDenied("You do not have permission to delete this task.")
+
+
+class DailyTechnicianLogAPIView(generics.ListAPIView):
+    serializer_class = DailyTechnicianLogSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return models.JobTask.objects.filter(
+            job__assigned_to=user,
+            status__in=[models.JobTask.Status.UPCOMING, models.JobTask.Status.IN_PROGRESS]
+        ).select_related('job').prefetch_related('required_equipment')
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        grouped_tasks = defaultdict(list)
+
+        for task in queryset:
+            day = task.job.scheduled_date
+            grouped_tasks[day].append(self.get_serializer(task).data)
+
+        return Response(grouped_tasks)

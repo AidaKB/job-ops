@@ -57,3 +57,13 @@ class JobTaskSerializer(serializers.ModelSerializer):
         if equipment_data is not None:
             instance.required_equipment.set([e['id'] if isinstance(e, dict) else e for e in equipment_data])
         return instance
+
+
+class DailyTechnicianLogSerializer(serializers.ModelSerializer):
+    job_title = serializers.CharField(source='job.title', read_only=True)
+    required_equipment = EquipmentSerializer(many=True, read_only=False)
+
+    class Meta:
+        model = models.JobTask
+        fields = ['id', 'job_title', 'title', 'description', 'status', 'completed_at', 'required_equipment', 'order',
+                  'created_at', 'updated_at']
