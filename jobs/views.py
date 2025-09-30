@@ -1,5 +1,6 @@
 from rest_framework import generics
 from . import models
+from .role_based_access import get_role_resolver
 from .serializers import (JobSerializer, TechnicianJobUpdateSerializer, JobTaskSerializer,
                           DailyTechnicianLogSerializer, JobAnalyticsSerializer)
 from core.permissions import IsAdminOrSalesForCreate
@@ -37,13 +38,8 @@ class JobDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_admin():
-            return models.Job.objects.all()
-        elif user.is_sales():
-            return models.Job.objects.filter(created_by=user)
-        elif user.is_technician():
-            return models.Job.objects.filter(assigned_to=user)
-        return models.Job.objects.none()
+        resolver = get_role_resolver(user)
+        return resolver.get_jobs(models.Job.objects, user)
 
     def get_serializer_class(self):
         user = self.request.user
@@ -57,33 +53,30 @@ class JobDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
         instance = self.get_object()
 
         if user.is_admin():
-            serializer.save()
+            return super().perform_update(serializer)
         elif user.is_sales():
             if instance.created_by != user:
                 raise PermissionDenied("You can only update jobs you created.")
             if 'status' in serializer.validated_data:
                 raise PermissionDenied("Sales agents are not allowed to update status.")
-            serializer.save()
+            return super().perform_update(serializer)
         elif user.is_technician():
             if instance.assigned_to != user:
                 raise PermissionDenied("You can only update jobs assigned to you.")
-            serializer.save()
-        else:
-            raise PermissionDenied("You do not have permission to update this job.")
+            return super().perform_update(serializer)
+        raise PermissionDenied("You do not have permission to update this job.")
 
     def perform_destroy(self, instance):
         user = self.request.user
         if user.is_admin():
-            instance.delete()
+            return super().perform_destroy(instance)
         elif user.is_sales():
             if instance.created_by == user:
-                instance.delete()
-            else:
-                raise PermissionDenied("You can only delete jobs you created.")
+                return super().perform_destroy(instance)
+            raise PermissionDenied("You can only delete jobs you created.")
         elif user.is_technician():
             raise PermissionDenied("Technicians are not allowed to delete jobs.")
-        else:
-            raise PermissionDenied("You do not have permission to delete this job.")
+        raise PermissionDenied("You do not have permission to delete this job.")
 
 
 class JobTaskListCreateAPIView(generics.ListCreateAPIView):
@@ -92,14 +85,9 @@ class JobTaskListCreateAPIView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = models.JobTask.objects.select_related('job').prefetch_related('required_equipment')
-        if user.is_admin():
-            return qs.all()
-        elif user.is_sales():
-            return qs.filter(job__created_by=user)
-        elif user.is_technician():
-            return qs.filter(job__assigned_to=user)
-        return qs.none()
+        queryset = models.JobTask.objects.select_related('job').prefetch_related('required_equipment')
+        resolver = get_role_resolver(user)
+        return resolver.get_tasks(queryset, user)
 
 
 class JobTaskDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
@@ -108,45 +96,38 @@ class JobTaskDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = models.JobTask.objects.select_related('job').prefetch_related('required_equipment')
-        if user.is_admin():
-            return qs.all()
-        elif user.is_sales():
-            return qs.filter(job__created_by=user)
-        elif user.is_technician():
-            return qs.filter(job__assigned_to=user)
-        return qs.none()
+        queryset = models.JobTask.objects.select_related('job').prefetch_related('required_equipment')
+        resolver = get_role_resolver(user)
+        return resolver.get_tasks(queryset, user)
 
     def perform_update(self, serializer):
         user = self.request.user
         instance = self.get_object()
 
         if user.is_admin():
-            serializer.save()
+            return super().perform_update(serializer)
         elif user.is_sales():
             if instance.job.created_by != user:
                 raise PermissionDenied("You can only update tasks for jobs you created.")
-            serializer.save()
+            return super().perform_update(serializer)
         elif user.is_technician():
             if instance.job.assigned_to != user:
                 raise PermissionDenied("You can only update tasks assigned to you.")
-            serializer.save()
-        else:
-            raise PermissionDenied("You do not have permission to update this task.")
+            return super().perform_update(serializer)
+
+        raise PermissionDenied("You do not have permission to update this task.")
 
     def perform_destroy(self, instance):
         user = self.request.user
         if user.is_admin():
-            instance.delete()
+            return super().perform_destroy(instance)
         elif user.is_sales():
             if instance.job.created_by == user:
-                instance.delete()
-            else:
-                raise PermissionDenied("You can only delete tasks for jobs you created.")
+                return super().perform_destroy(instance)
+            raise PermissionDenied("You can only delete tasks for jobs you created.")
         elif user.is_technician():
             raise PermissionDenied("Technicians are not allowed to delete tasks.")
-        else:
-            raise PermissionDenied("You do not have permission to delete this task.")
+        raise PermissionDenied("You do not have permission to delete this task.")
 
 
 class DailyTechnicianLogAPIView(generics.ListAPIView):
@@ -175,7 +156,6 @@ class JobAnalyticsAPIView(APIView):
     permission_classes = [permissions.IsAdminUser]
 
     def get(self, request, *args, **kwargs):
-        # average task time
         completed_tasks = models.JobTask.objects.exclude(completed_at__isnull=True)
         avg_time = completed_tasks.aggregate(
             avg_time=Avg(
@@ -189,7 +169,6 @@ class JobAnalyticsAPIView(APIView):
         if avg_time:
             avg_time = avg_time.total_seconds() / 3600
 
-        # most used equipment
         equipment_counts = Equipment.objects.annotate(
             usage_count=Count('required_by_tasks')
         ).order_by('-usage_count')
