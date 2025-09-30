@@ -20,13 +20,8 @@ class JobListCreateAPIView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_admin():
-            return models.Job.objects.all()
-        elif user.is_sales():
-            return models.Job.objects.filter(created_by=user)
-        elif user.is_technician():
-            return models.Job.objects.filter(assigned_to=user)
-        return models.Job.objects.none()
+        resolver = get_role_resolver(user)
+        return resolver.get_jobs(models.Job.objects, user)
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
